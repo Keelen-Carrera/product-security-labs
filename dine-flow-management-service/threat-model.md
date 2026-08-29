@@ -2,8 +2,8 @@
 
 **Target:** [`smart-kitchen-mgmt`](https://github.com/allaboutmike/smart-kitchen-mgmt), `management_service` backend (Express + TypeScript + Prisma + PostgreSQL)
 **Scope:** Backend API only — frontend, `python_services`, and `supplier_api` are out of scope for this pass
-**Method:** Manual review of `server.ts`, all five routers, and `schema.prisma` against STRIDE, cross-checked against dependency scan results
-**Status:** Living document — SAST and secrets-scan findings still being folded in
+**Method:** Manual review of `server.ts`, all five routers, and `schema.prisma` against STRIDE, cross-checked against SCA/SAST/secrets scan results
+**Status:** Complete for this scope (2026-08-28)
 
 ## Context
 
@@ -48,13 +48,25 @@ Every router is mounted through the same loop in `server.ts` with zero authentic
 
 Worth stating explicitly rather than leaving silent: `orders.router.ts` and `metrics.router.ts` both run raw SQL through `Db.$queryRaw` / `tx.$queryRaw` with template-literal interpolation — the pattern that causes SQL injection when done with plain string concatenation. Prisma's tagged-template `$queryRaw` parameterizes interpolated values automatically, so this is **not** injectable as written. Confirmed by reading the actual calls, not assumed from the library's reputation.
 
+## Scan results
+
+Three tools, three different angles — dependencies, code patterns, and secrets:
+
+| Tool | Scope | Result |
+|---|---|---|
+| `npm audit` (SCA) | `management_service` dependency tree | 15 vulnerabilities found (2 low, 3 moderate, 10 high) — triaged by production-reachability, fixed via `npm audit fix`, a scoped `--force` bump, and a `package.json` `overrides` entry for a transitively-pinned dependency automated tooling couldn't otherwise reach. **0 remaining.** See [commit `8b8c310`](https://github.com/Keelen-Carrera/smart-kitchen-mgmt/commit/8b8c310). |
+| `semgrep` (SAST) | 43 tracked files, OWASP Top 10 + JS + TS rulesets (83 rules) | **0 findings.** Confirms the code that exists doesn't contain flawed patterns (unsafe eval, injection-prone string building, weak crypto) — it does not and cannot detect a missing control, which is why this result doesn't change the headline finding below. |
+| `gitleaks` (secrets) | Full git history, 384 commits | **0 leaks found.** No credentials or secrets were ever committed and left behind, not just absent from the current working tree. |
+
+Clean SAST and secrets results are a real, honest finding worth stating plainly — not a formality. But paired with the headline finding below, they make a specific point: this codebase's exposure isn't from sloppy code, it's from an architectural control that was never built.
+
 ## The headline finding
 
 The dependency vulnerabilities patched in [this commit](https://github.com/Keelen-Carrera/smart-kitchen-mgmt/commit/8b8c310) were real and worth fixing. But missing authentication isn't just another item on the same list — it's a multiplier. Because no auth barrier exists, *every* vulnerability in this app, including the ones already patched, was directly internet-reachable by anyone, with nothing reducing who could attempt to trigger them. Ranked by blast radius (full read/write access to business data plus live financial metrics — all three CIA legs) against attacker effort (zero — no credentials needed at all), broken access control ([OWASP A01:2021](https://owasp.org/Top10/A01_2021-Broken_Access_Control/)) is the finding that should lead any summary of this codebase's security posture, not the CVE count.
 
-## Open items
+## Open items — not fixed in this pass, flagged for future work
 
+- **Missing authentication/authorization** — the headline finding above. Out of scope to fix in this pass (would require picking and implementing an auth strategy, a real design decision, not a quick patch); tracked here as the clear next lab.
 - **Rate limiting** — absent app-wide; recommended regardless of whether/how auth gets added.
 - **CORS** — needs explicit origin allowlisting once auth exists; not urgent before that.
 - **Outbound `fetch()` to supplier APIs** (`stock.router.ts`) — URL is read from the database, and no endpoint in this codebase currently lets a caller set it, so this isn't attacker-reachable SSRF today. Worth re-checking if a suppliers-management endpoint is ever added.
-- **SAST scan (semgrep)** and **secrets scan (gitleaks)** — in progress, results to follow in this document.
