@@ -1,13 +1,13 @@
-# Lab 1 — Dependency, Static-Analysis, and Secrets Scans
+# Lab 1: Dependency, Static-Analysis, and Secrets Scans
  
-**Companion to:** [threat-model.md](./threat-model.md) — read that first for architecture and the STRIDE analysis this lab cross-checks against.
+**Companion to:** [threat-model.md](./threat-model.md): Read that first for architecture and the STRIDE analysis this lab cross-checks against.
 **Target:** `management_service` in [`smart-kitchen-mgmt`](https://github.com/allaboutmike/smart-kitchen-mgmt)
 **Date:** 2026-08-28
 **Method:** Ran SCA (`npm audit`), SAST (`semgrep`), and secrets (`gitleaks`) scans by hand once against the codebase and full git history, triaged findings by actual reachability, fixed what needed fixing.
  
 ## Scan results
  
-Three tools, three different angles — dependencies, code patterns, and secrets:
+Three tools, three different angles, dependencies, code patterns, and secrets:
  
 | Tool | Scope | Result |
 |---|---|---|

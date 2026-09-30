@@ -1,18 +1,18 @@
-# Threat Model — Dine Flow `management_service`
+# Threat Model | Dine Flow `management_service`
 
 **Target:** [`smart-kitchen-mgmt`](https://github.com/allaboutmike/smart-kitchen-mgmt), `management_service` backend (Express + TypeScript + Prisma + PostgreSQL)
-**Scope:** Backend API only — frontend, `python_services`, and `supplier_api` are out of scope for this pass
+**Scope:** Backend API only, frontend, `python_services`, and `supplier_api` are out of scope for this pass
 **Method:** Manual review of `server.ts`, all five routers, and `schema.prisma` against STRIDE
 **Status:** STRIDE analysis complete. Scan and tooling work against this codebase lives in the two lab writeups below, not duplicated here.
 
 ## Related labs
 
-- [Lab 1 — Dependency, SAST, and secrets scans](./lab-1-dependency-and-code-scans.md) — first pass: ran SCA/SAST/secrets scans by hand once, triaged and fixed what needed fixing.
-- [Lab 2 — CI pipeline and scanner verification](./lab-2-ci-pipeline.md) — second pass: wired those same scans into GitHub Actions, then verified the scanners themselves actually behave as expected instead of trusting a green checkmark.
+- [Lab 1: Dependency, SAST, and secrets scans](./lab-1-dependency-and-code-scans.md) First pass: ran SCA/SAST/secrets scans by hand once, triaged and fixed what needed fixing.
+- [Lab 2: CI pipeline and scanner verification](./lab-2-ci-pipeline.md) Second pass: wired those same scans into GitHub Actions, then verified the scanners themselves actually behave as expected instead of trusting a green checkmark.
 
 ## Context
 
-Dine Flow was a 6-person cohort project (restaurant inventory/order management platform, ~04/2025–06/2025). I owned the `stocks` router and backend logic for stock/menu/order data access. This document is a retrospective security assessment I'm running against that codebase on my own initiative, as part of building AppSec/product security lab work — not a critique of the original team. Security wasn't the assignment; a working cohort project in a compressed timeframe was. That's exactly the kind of codebase this document exists to practice on.
+Dine Flow was a 6-person cohort project (restaurant inventory/order management platform, ~04/2025–06/2025). I owned the `stocks` router and backend logic for stock/menu/order data access. This document is a retrospective security assessment I'm running against that codebase on my own initiative, as part of building AppSec/product security lab work, not a critique of the original team. Security wasn't the assignment; a working cohort project in a compressed timeframe was. That's exactly the kind of codebase this document exists to practice on.
 
 ## System overview
 
@@ -59,7 +59,7 @@ The dependency vulnerabilities patched in [this commit](https://github.com/Keele
 
 ## Open items
 
-- **Missing authentication/authorization** — the headline finding above. Out of scope to fix in these two labs (picking and implementing an auth strategy is a real design decision, not a quick patch); tracked here as the clear next lab.
-- **Rate limiting** — absent app-wide; recommended regardless of whether/how auth gets added.
-- **CORS** — needs explicit origin allowlisting once auth exists; not urgent before that.
-- **Outbound `fetch()` to supplier APIs** (`stock.router.ts`) — URL is read from the database, and no endpoint in this codebase currently lets a caller set it, so this isn't attacker-reachable SSRF today. Worth re-checking if a suppliers-management endpoint is ever added.
+- **Missing authentication/authorization**: the headline finding above. Out of scope to fix in these two labs (picking and implementing an auth strategy is a real design decision, not a quick patch); tracked here as the clear next lab.
+- **Rate limiting**: absent app-wide; recommended regardless of whether/how auth gets added.
+- **CORS**: needs explicit origin allowlisting once auth exists; not urgent before that.
+- **Outbound `fetch()` to supplier APIs** (`stock.router.ts`): URL is read from the database, and no endpoint in this codebase currently lets a caller set it, so this isn't attacker-reachable SSRF today. Worth re-checking if a suppliers-management endpoint is ever added.
