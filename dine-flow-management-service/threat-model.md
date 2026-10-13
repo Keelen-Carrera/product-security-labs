@@ -36,26 +36,26 @@ flowchart LR
     stocks -.->|fetch&#40&#41, DB-configured URL only| supplier
 ```
 
-Every router is mounted through the same loop in `server.ts` with zero authentication middleware. Verified individually across all five router files — none define their own auth either. This is an app-wide structural gap, not something isolated to one endpoint.
+Every router is mounted through the same loop in `server.ts` with zero authentication middleware. Verified individually across all five router files.
 
 ## STRIDE analysis
 
 | Category | Finding |
-|---|---|
-| **Spoofing** | Not applicable in the literal sense — no identity system exists, so there's nothing to spoof. Root cause is the same one driving most of this table: missing authentication ([OWASP API2:2023](https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/)). |
+| --- | --- |
+| **Spoofing** | Not applicable in the literal sense. No identity system exists, so there's nothing to spoof. Root cause is the same one driving most of this table: missing authentication ([OWASP API2:2023](https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/)). |
 | **Tampering** | Any anonymous caller can `POST`/`PUT` to `stocks` and `orders` with no ownership check and no input validation beyond Prisma's column types. `orders.router.ts` `POST /` trusts the shape of `req.body.orderItems` fully. |
-| **Repudiation** | No audit trail. `console.log` calls aren't persisted and don't capture caller identity. The schema has no `createdBy`/`userId` column anywhere (`expenses`, `stock`, `orders`) — retrofitting auth later still couldn't attribute past actions without a schema change. |
-| **Information Disclosure** | Concrete, not just theoretical: `GET /api/metrics/Productivity` and `GET /api/metrics/waste` expose live profit, revenue, and best/worst-seller data with zero authentication. Separately, `cors()` with no options reflects any origin — a landmine for whenever session-based auth is added later. (Credit where due: error handlers return generic `"Internal server error"`, not stack traces.) |
-| **Denial of Service** | No rate limiting anywhere. This is what made the dependency-level ReDoS CVEs (see [Dependency Remediation](https://github.com/Keelen-Carrera/smart-kitchen-mgmt/commit/8b8c310)) actually dangerous pre-fix — nothing throttled a malicious payload. It's a standing gap independent of those specific CVEs. |
-| **Elevation of Privilege** | Not meaningfully applicable — there's no privilege tiering to elevate out of. This is downstream of the missing-auth problem, not a separate issue. |
+| **Repudiation** | No audit trail. `console.log` calls aren't persisted and don't capture caller identity. The schema has no `createdBy`/`userId` column anywhere (`expenses`, `stock`, `orders`). Retrofitting auth later still couldn't attribute past actions without a schema change. |
+| **Information Disclosure** | Concrete, not just theoretical: `GET /api/metrics/Productivity` and `GET /api/metrics/waste` expose live profit, revenue, and best/worst-seller data with zero authentication. Separately, `cors()` with no options reflects any origin, a landmine for whenever session-based auth is added later. (Credit where due: error handlers return generic `"Internal server error"`, not stack traces.) |
+| **Denial of Service** | No rate limiting anywhere. This is what made the dependency-level ReDoS CVEs (see [Dependency Remediation](https://github.com/Keelen-Carrera/smart-kitchen-mgmt/commit/8b8c310)) actually dangerous pre-fix, nothing throttled a malicious payload. It's a standing gap independent of those specific CVEs. |
+| **Elevation of Privilege** | Not meaningfully applicable. There's no privilege tiering to elevate out of. This is downstream of the missing-auth problem. |
 
 ## Checked and ruled out
 
-Worth stating explicitly rather than leaving silent: `orders.router.ts` and `metrics.router.ts` both run raw SQL through `Db.$queryRaw` / `tx.$queryRaw` with template-literal interpolation — the pattern that causes SQL injection when done with plain string concatenation. Prisma's tagged-template `$queryRaw` parameterizes interpolated values automatically, so this is **not** injectable as written. Confirmed by reading the actual calls, not assumed from the library's reputation.
+Worth stating explicitly rather than leaving silent: `orders.router.ts` and `metrics.router.ts` both run raw SQL through `Db.$queryRaw` / `tx.$queryRaw` with template-literal interpolation, the pattern that causes SQL injection when done with plain string concatenation. Prisma's tagged-template `$queryRaw` parameterizes interpolated values automatically, so this is **not** injectable as written. Confirmed by reading the actual calls, not assumed from the library's reputation.
 
 ## The headline finding
 
-The dependency vulnerabilities patched in [this commit](https://github.com/Keelen-Carrera/smart-kitchen-mgmt/commit/8b8c310) were real and worth fixing. But missing authentication isn't just another item on the same list — it's a multiplier. Because no auth barrier exists, *every* vulnerability in this app, including the ones already patched, was directly internet-reachable by anyone, with nothing reducing who could attempt to trigger them. Ranked by blast radius (full read/write access to business data plus live financial metrics — all three CIA legs) against attacker effort (zero — no credentials needed at all), broken access control ([OWASP A01:2021](https://owasp.org/Top10/A01_2021-Broken_Access_Control/)) is the finding that should lead any summary of this codebase's security posture, not the CVE count.
+The dependency vulnerabilities patched in [this commit](https://github.com/Keelen-Carrera/smart-kitchen-mgmt/commit/8b8c310) were real and worth fixing. Because no auth barrier exists, *every* vulnerability in this app, including the ones already patched, was directly internet-reachable by anyone, with nothing reducing who could attempt to trigger them. Ranked by blast radius (full read/write access to business data plus live financial metrics, all three CIA legs) against attacker effort (zero. No credentials needed at all), broken access control ([OWASP A01:2021](https://owasp.org/Top10/A01_2021-Broken_Access_Control/)) is the finding that should lead any summary of this codebase's security posture, not the CVE count.
 
 ## Open items
 
